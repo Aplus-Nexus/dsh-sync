@@ -12,7 +12,7 @@
  */
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { deriveKey, keyFingerprint } from './crypto.js'
+import { deriveKey, keyFingerprint, open, seal } from './crypto.js'
 import { decodeChunk, encodeChunks, notePath, SALT_PATH, parseChunkName } from './store.js'
 import { canonicalJson, digestOf, humanBytes, isoTime, nowMs, parseJson } from './util.js'
 import { comparePortable, titleOf } from './portable.js'
@@ -173,7 +173,6 @@ export class SyncEngine {
 
   async writeSessionMeta(root, meta) {
     const path = `sessions/${root}/meta.json.enc`
-    const { seal } = await import('./crypto.js')
     const bytes = seal(this.key, Buffer.from(canonicalJson(meta)), `dsh-sync:meta:${path}`)
     await this.backend.write(path, bytes)
   }
@@ -297,7 +296,6 @@ export class SyncEngine {
   async addNote({ title, body, tags = [] }) {
     const id = digestOf({ title, body, at: nowMs() }).slice(0, 16)
     const path = notePath(this.device, id)
-    const { seal } = await import('./crypto.js')
     const payload = canonicalJson({ v: 1, id, device: this.device, agent: this.agent, title, body, tags, ts: nowMs() })
     await this.backend.write(path, seal(this.key, Buffer.from(payload), `dsh-sync:note:${path}`))
     await this.backend.sync({ direction: 'push', message: `note: ${title}` })
@@ -306,7 +304,6 @@ export class SyncEngine {
 
   /** Read every note newer than a timestamp (0 = all). */
   async listNotes({ since = 0, limit = 50 } = {}) {
-    const { open } = await import('./crypto.js')
     const listing = await this.backend.list('notes/')
     const notes = []
     for (const entry of listing) {
