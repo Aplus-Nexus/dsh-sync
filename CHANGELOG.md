@@ -4,6 +4,26 @@ All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-11-24
+
+### Added
+
+- **Foreign conversations become native.** A conversation with no DSH log of its
+  own — Codex, Claude Code, an imported transcript — is synthesized into a
+  valid v4 session with a full turn/step lifecycle, validated with DSH's own
+  codec before it is written, and then continues like any other conversation.
+  Existing sessions are never overwritten.
+- **`dsh-sync ingest --native`** materializes a transcript as a local DSH
+  session at the same time it is published to the bus.
+
+### Fixed
+
+- `encodeLogBytes` silently wrote `[object Object]` when handed event objects
+  instead of JSONL lines, producing a log that looked valid and could not be
+  read. It now accepts both and refuses anything else.
+- A claimed automatic re-push of an imported session no longer duplicates the
+  prefix; only the device's own continuation is published.
+
 ## [0.1.0] — 2026-11-24
 
 First release. Everything below is new.
