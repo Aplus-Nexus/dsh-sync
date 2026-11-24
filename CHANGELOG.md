@@ -4,6 +4,15 @@ All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-11-24
+
+### Fixed
+
+- Compaction now measures coverage over the *union* of kept chunk intervals, not
+  against a single longer chunk. A range split across two later chunks is
+  recognised as redundant too, which is the shape an interrupted push actually
+  leaves behind.
+
 ## [0.3.0] — 2026-11-24
 
 ### Added

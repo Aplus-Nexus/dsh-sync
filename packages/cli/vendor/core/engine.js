@@ -346,12 +346,16 @@ export class SyncEngine {
   }
 
   /**
-   * Remove chunk files whose sequence range is already covered by another chunk
+   * Remove chunk files whose sequence range is already covered by other chunks
    * of the same session and device.
    *
    * This repairs the one redundancy an interrupted push can create: a shorter
-   * chunk left behind when the next attempt re-sent a longer range. Reading is
-   * already duplicate-safe; compacting keeps the repository from growing.
+   * chunk left behind when the next attempt re-sent a longer range, or a range
+   * now covered by the union of two later chunks. Coverage is computed over the
+   * union of kept intervals, not against a single chunk, so a range split across
+   * two chunks is still recognised as redundant.
+   *
+   * Reading is already duplicate-safe; compacting keeps the repository small.
    *
    * @returns {{removed: number, bytes: number}}
    */
@@ -370,15 +374,15 @@ export class SyncEngine {
     }
     const doomed = []
     for (const chunks of groups.values()) {
-      // A longer chunk with the same start comes first, so it wins the coverage.
+      // Longest first, so a superset is kept before the slices it contains.
       chunks.sort((a, b) => a.first - b.first || b.last - a.last)
-      let coveredTo = -1
+      const covered = []
       for (const chunk of chunks) {
-        if (chunk.last <= coveredTo) {
+        if (isCovered(covered, chunk.first, chunk.last)) {
           doomed.push(chunk)
           continue
         }
-        coveredTo = Math.max(coveredTo, chunk.last)
+        mergeInterval(covered, chunk.first, chunk.last)
       }
     }
     let bytes = 0
@@ -444,4 +448,29 @@ function toChunkRecord(value) {
 function fromChunkRecord(raw) {
   if (!raw || typeof raw !== 'object' || typeof raw.id !== 'string' || typeof raw.origin !== 'object') return null
   return raw
+}
+
+/** Whether [first, last] is fully inside a sorted, merged interval list. */
+function isCovered(intervals, first, last) {
+  for (const [start, end] of intervals) {
+    if (start <= first && last <= end) return true
+  }
+  return false
+}
+
+/** Add [first, last] to a merged, sorted interval list in place. */
+function mergeInterval(intervals, first, last) {
+  intervals.push([first, last])
+  intervals.sort((a, b) => a[0] - b[0])
+  const merged = []
+  for (const interval of intervals) {
+    const previous = merged.at(-1)
+    if (previous !== undefined && interval[0] <= previous[1] + 1) {
+      previous[1] = Math.max(previous[1], interval[1])
+      continue
+    }
+    merged.push([...interval])
+  }
+  intervals.length = 0
+  intervals.push(...merged)
 }

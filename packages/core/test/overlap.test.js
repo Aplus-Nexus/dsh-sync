@@ -73,6 +73,36 @@ test('compaction removes a chunk fully covered by a longer one', async () => {
   }
 })
 
+test('a range covered by the union of two chunks is compacted', async () => {
+  const backend = new MemoryBackend()
+  const dir = await tempDir()
+  try {
+    const a = new SyncEngine({ backend, statePath: join(dir, 'a.json'), device: 'phone-a' })
+    await a.open({ passphrase: 'a long shared passphrase' })
+    // Three chunks whose ranges overlap without any single one covering the others.
+    await a.push([record('phone-a', 's1', 0, 'a'), record('phone-a', 's1', 1, 'b')])
+    await a.push([record('phone-a', 's1', 2, 'c'), record('phone-a', 's1', 3, 'd')])
+    await a.push([record('phone-a', 's1', 0, 'a'), record('phone-a', 's1', 1, 'b'), record('phone-a', 's1', 2, 'c'), record('phone-a', 's1', 3, 'd')])
+    const before = [...backend.files.keys()].filter((path) => path.startsWith('data/'))
+    assert.equal(before.length, 3)
+
+    const result = await a.compact()
+    // The longest chunk covers 0-3; the two slices are fully inside it.
+    assert.equal(result.removed, 2)
+    const after = [...backend.files.keys()].filter((path) => path.startsWith('data/'))
+    assert.equal(after.length, 1)
+    const pulled = await (async () => {
+      const b = new SyncEngine({ backend, statePath: join(dir, 'b.json'), device: 'laptop' })
+      await b.open({ passphrase: 'a long shared passphrase' })
+      return b.pull()
+    })()
+    assert.deepEqual(pulled.records.map((r) => r.text).sort(), ['a', 'b', 'c', 'd'])
+    assert.equal(pulled.duplicates, 0)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('compaction keeps non-overlapping ranges and different devices', async () => {
   const backend = new MemoryBackend()
   const dir = await tempDir()
