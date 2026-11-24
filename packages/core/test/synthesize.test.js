@@ -82,6 +82,13 @@ test('a relative cwd is refused rather than written', () => {
   assert.throws(() => synthesizeSession({ sessionId: 's', records: [record('user', 'a', 1)], cwd: 'relative/path' }), /absolute cwd/)
 })
 
+test('a Windows cwd is accepted like a POSIX one', () => {
+  // The importing host writes its own platform's path; refusing one would make
+  // synthesis impossible on Windows.
+  const { header } = synthesizeSession({ sessionId: 'session-import-w', records: [record('user', 'a', 1)], cwd: 'C:\\Users\\me\\code' })
+  assert.equal(header.cwd, 'C:\\Users\\me\\code')
+})
+
 test('the encoded log is the same physical shape DSH writes', () => {
   const { header, events } = synthesizeSession({ sessionId: 'session-import-bytes', records: [record('user', 'a', 1), record('assistant', 'b', 2)], cwd: CWD })
   const bytes = encodeSynthesizedLog(header, events)

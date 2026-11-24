@@ -13,6 +13,7 @@
  * instead of on a phone.
  */
 import { randomUUID } from 'node:crypto'
+import { isAbsolute, win32 } from 'node:path'
 import { encodeLogBytes } from './native.js'
 
 const AGENT_PRESET = 'standard'
@@ -37,7 +38,9 @@ export function synthesizeSessionId(seed) {
  */
 export function synthesizeSession({ sessionId, records, cwd, createdAt, sourceLabel = 'imported' }) {
   if (typeof sessionId !== 'string' || sessionId === '') throw new Error('synthesizeSession needs a sessionId')
-  if (typeof cwd !== 'string' || !cwd.startsWith('/')) throw new Error('synthesizeSession needs an absolute cwd')
+  // A header's cwd must be absolute for the platform that will read it: a phone
+  // writes POSIX paths, a Windows desktop writes `C:\\...`. Both are accepted.
+  if (typeof cwd !== 'string' || !(isAbsolute(cwd) || win32.isAbsolute(cwd))) throw new Error('synthesizeSession needs an absolute cwd')
   const ordered = [...records]
     .filter((record) => record && typeof record.text === 'string' && record.text.trim() !== '')
     .sort(compareByTime)

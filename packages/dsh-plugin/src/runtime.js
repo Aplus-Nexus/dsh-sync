@@ -23,7 +23,7 @@ import {
   tailFrom,
   titleOf,
 } from '../vendor/core/index.js'
-import { join } from 'node:path'
+import { isAbsolute, join, win32 } from 'node:path'
 
 export class SyncRuntime {
   constructor(ctx, config, paths) {
@@ -208,10 +208,16 @@ export class SyncRuntime {
     return { imported: result.imported, path: result.path, sessionId: result.sessionId ?? targetId, synthesized: true, reason: result.reason }
   }
 
-  /** An absolute working directory this device can actually open. */
+  /**
+   * An absolute working directory on this device.
+   *
+   * A synthesized header must carry a cwd the *reading* platform accepts, so
+   * the host's own path is used verbatim rather than forced to POSIX.
+   */
   workspaceCwd() {
     const candidate = process.env.DSH_SYNC_CWD ?? process.cwd()
-    return candidate.startsWith('/') || /^[A-Za-z]:[\\/]/.test(candidate) ? candidate : '/'
+    if (isAbsolute(candidate) || win32.isAbsolute(candidate)) return candidate
+    return win32.isAbsolute(process.cwd()) ? process.cwd() : '/'
   }
 
   /**
