@@ -80,7 +80,7 @@ jobs:
           cache: pnpm
       - run: pnpm add --global @deepseek-ai/dsh-plugin-market-index@0.2.2-rc.1 || true
       - run: node scripts/build-market.mjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: market-index
           path: site/market-index.json
