@@ -11,7 +11,7 @@
 [![CI](https://github.com/Aplus-Nexus/dsh-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/Aplus-Nexus/dsh-sync/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Aplus-Nexus/dsh-sync?color=6fe3c4)](https://github.com/Aplus-Nexus/dsh-sync/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-5aa9ff.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%E2%89%A522-3c873a.svg)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%E2%89%A524-3c873a.svg)](https://nodejs.org)
 
 [English](README.en.md) · [安全模型](SECURITY.md) · [常见问题](docs/faq.md)
 

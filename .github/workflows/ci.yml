@@ -20,14 +20,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Node 24 is the floor: DSH needs >=24.9 and the zstd bindings live there.
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node: [22, 24]
-        exclude:
-          # Windows coverage matters (path handling), but one Node line is enough there.
-          - os: windows-latest
-            node: 24
-          - os: macos-latest
-            node: 24
+        node: [24]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,11 +52,11 @@ jobs:
         run: node --test packages/*/test/*.test.js
 
       - name: Plugin manifest and view check
-        if: matrix.os == 'ubuntu-latest' && matrix.node == 22
+        if: matrix.os == 'ubuntu-latest'
         run: node scripts/check-plugin.mjs
 
       - name: Repository hygiene (no secrets, links resolve, JSON parses)
-        if: matrix.os == 'ubuntu-latest' && matrix.node == 22
+        if: matrix.os == 'ubuntu-latest'
         run: node scripts/check-repo.mjs
 
   market:
@@ -72,7 +67,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm add --global @deepseek-ai/dsh-plugin-market-index@0.2.2-rc.1 || true
       - run: node scripts/build-market.mjs

@@ -12,7 +12,7 @@
     "url": "git+https://github.com/Aplus-Nexus/dsh-sync.git"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24.9.0"
   },
   "workspaces": [
     "packages/*"
