@@ -39,10 +39,10 @@ test('session ids escape unsafe characters', () => {
 })
 
 test('the log path is the one DSH writes', () => {
-  assert.equal(
-    logPathFor('/root/.dsh/sessions', '/root/workspace', 'session-abc'),
-    '/root/.dsh/sessions/--root-workspace--/session-abc/session.v4.jsonl.zstd',
-  )
+  // `join` is platform-specific, so compare the segments rather than a literal
+  // path: the same code must produce a POSIX path on Linux and a Windows one there.
+  const path = logPathFor('/root/.dsh/sessions', '/root/workspace', 'session-abc')
+  assert.deepEqual(path.split(/[\\/]/), ['', 'root', '.dsh', 'sessions', '--root-workspace--', 'session-abc', 'session.v4.jsonl.zstd'])
 })
 
 test('a cwd that is not absolute on the reading platform is replaced', () => {
