@@ -1,0 +1,15 @@
+# dsh-sync: applies one loader patch that mounts the plugin.
+- insert:
+    - id: dsh-sync
+      name: "@aplus-nexus/dsh-sync"
+      config:
+        enabled: true
+        backend: git
+        repoUrl: ""
+        branch: main
+        passphrase: ""
+        deviceName: ""
+        intervalSec: 60
+        pushOnTurnEnd: true
+        importNative: true
+        mirror: true

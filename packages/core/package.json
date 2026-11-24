@@ -1,0 +1,41 @@
+{
+  "name": "@aplus-nexus/dsh-sync-core",
+  "version": "0.1.0",
+  "description": "Message-level, end-to-end encrypted session sync core for DSH, dsh-go and Codex",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./crypto": "./src/crypto.js",
+    "./native": "./src/native.js",
+    "./git": "./src/git-backend.js"
+  },
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "author": "Aplus-Nexus",
+  "homepage": "https://github.com/Aplus-Nexus/dsh-sync#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aplus-Nexus/dsh-sync.git",
+    "directory": "packages/core"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-go",
+    "sync",
+    "e2ee",
+    "codex",
+    "mcp"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

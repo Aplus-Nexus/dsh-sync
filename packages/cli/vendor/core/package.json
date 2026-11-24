@@ -1,0 +1,5 @@
+{
+  "name": "dsh-sync-core-vendored",
+  "type": "module",
+  "private": true
+}

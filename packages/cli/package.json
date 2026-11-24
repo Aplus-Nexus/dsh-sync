@@ -1,0 +1,30 @@
+{
+  "name": "@aplus-nexus/dsh-sync-cli",
+  "version": "0.1.0",
+  "description": "Command line for dsh-sync: first-run setup, verify, sessions and export",
+  "type": "module",
+  "bin": {
+    "dsh-sync": "bin/dsh-sync.js"
+  },
+  "files": [
+    "bin",
+    "vendor"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "author": "Aplus-Nexus",
+  "homepage": "https://github.com/Aplus-Nexus/dsh-sync#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aplus-Nexus/dsh-sync.git",
+    "directory": "packages/cli"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-go",
+    "cli",
+    "sync"
+  ]
+}

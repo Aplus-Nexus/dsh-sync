@@ -1,0 +1,6 @@
+packages:
+  - "packages/*"
+
+# The plugin declares the DSH host API as a peer-ish dependency; installing it
+# from npm keeps `pnpm install` honest in CI without pinning a private build.
+onlyBuiltDependencies: []

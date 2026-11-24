@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish (x.y.z)
+        required: true
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile=false
+      - name: Check the tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./packages/dsh-plugin/package.json').version")"
+          test "$TAG" = "$PKG" || { echo "tag $TAG does not match package $PKG"; exit 1; }
+      - run: git config --global user.email "ci@dsh-sync.local" && git config --global user.name "dsh-sync ci" && git config --global init.defaultBranch main
+      - run: node scripts/build.mjs
+      - run: node --test packages/*/test/*.test.js
+
+  release:
+    name: build and publish
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile=false
+      - run: node scripts/build.mjs
+
+      - name: Pack the installable artifacts
+        run: node scripts/pack.mjs
+
+      - name: Market index pinned to this commit
+        run: node scripts/build-market.mjs --commit "$GITHUB_SHA" --out site/market-index.json
+
+      - name: Copy site assets
+        run: node scripts/build-site.mjs
+
+      - name: Publish to npm
+        if: ${{ vars.PUBLISH_NPM == 'true' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: node scripts/publish.mjs
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: dsh-sync ${{ github.ref_name }}
+          body_path: dist/RELEASE_NOTES.md
+          files: |
+            dist/*.tgz
+            dist/manifest.json
+          draft: false
+          generate_release_notes: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  pages:
+    name: publish market index
+    needs: release
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

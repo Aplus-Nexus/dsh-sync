@@ -1,0 +1,30 @@
+{
+  "name": "@aplus-nexus/dsh-sync-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that lets Codex, Claude Code and any MCP agent share a DSH message bus",
+  "type": "module",
+  "bin": {
+    "dsh-sync-mcp": "bin/mcp.js"
+  },
+  "files": [
+    "bin",
+    "vendor"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "author": "Aplus-Nexus",
+  "homepage": "https://github.com/Aplus-Nexus/dsh-sync#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aplus-Nexus/dsh-sync.git",
+    "directory": "packages/mcp-server"
+  },
+  "keywords": [
+    "mcp",
+    "codex",
+    "dsh",
+    "sync"
+  ]
+}

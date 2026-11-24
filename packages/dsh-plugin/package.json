@@ -1,0 +1,86 @@
+{
+  "name": "@aplus-nexus/dsh-sync",
+  "version": "0.1.0",
+  "description": "Message-level encrypted session sync for the dsh-go phone app and DSH",
+  "type": "module",
+  "main": "src/index.js",
+  "files": [
+    "src",
+    "vendor",
+    "cordis.patch.yml"
+  ],
+  "license": "MIT",
+  "author": "Aplus-Nexus",
+  "homepage": "https://github.com/Aplus-Nexus/dsh-sync#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aplus-Nexus/dsh-sync.git",
+    "directory": "packages/dsh-plugin"
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dshGo": {
+    "v": 1,
+    "title": {
+      "zh": "消息云同步",
+      "en": "Message sync"
+    },
+    "icon": "cloud",
+    "minApp": "1.2.0",
+    "contributes": {
+      "composer.actions": [
+        {
+          "id": "sync-now",
+          "label": {
+            "zh": "同步",
+            "en": "Sync"
+          },
+          "icon": "refresh"
+        },
+        {
+          "id": "sync-open",
+          "label": {
+            "zh": "同步面板",
+            "en": "Sync panel"
+          },
+          "icon": "cloud"
+        }
+      ],
+      "composer.strip": [
+        {
+          "id": "status",
+          "icon": "cloud",
+          "panel": "sync"
+        }
+      ],
+      "panels": [
+        {
+          "id": "sync",
+          "title": {
+            "zh": "消息云同步",
+            "en": "Message sync"
+          },
+          "icon": "cloud",
+          "placement": [
+            "session.tab",
+            "features",
+            "plugin"
+          ],
+          "presentation": "page"
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "~3.19.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

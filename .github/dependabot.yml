@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      dev-dependencies:
+        patterns: ['*']
+    ignore:
+      # DSH is the host, not a library: a major bump would only break loading.
+      - dependency-name: '@deepseek-ai/*'
+        update-types: ['version-update:semver-major']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

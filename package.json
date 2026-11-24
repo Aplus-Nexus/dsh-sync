@@ -1,0 +1,29 @@
+{
+  "name": "dsh-sync-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Message-level, end-to-end encrypted cloud sync for DSH Go / DSH / Codex",
+  "license": "MIT",
+  "author": "Aplus-Nexus",
+  "homepage": "https://github.com/Aplus-Nexus/dsh-sync#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aplus-Nexus/dsh-sync.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && node --test packages/*/test/*.test.js",
+    "check": "node scripts/check-repo.mjs && node scripts/check-plugin.mjs",
+    "market": "node scripts/build-market.mjs",
+    "site": "node scripts/build-market.mjs && node scripts/build-site.mjs",
+    "pack": "node scripts/build.mjs && node scripts/pack.mjs"
+  },
+  "packageManager": "pnpm@10.0.0"
+}
