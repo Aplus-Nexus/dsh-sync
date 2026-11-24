@@ -29,7 +29,8 @@ export {
   headerSummary,
   LOG_HEADER_TYPE,
 } from './native.js'
-export { importNativeSession, hasLocalSession, readLocalLog, digestOfBytes } from './import.js'
+export { importNativeSession, hasLocalSession, readLocalLog, digestOfBytes, writeLog } from './import.js'
+export { synthesizeSession, synthesizeSessionId, encodeSynthesizedLog } from './synthesize.js'
 export {
   encodeChunks,
   decodeChunk,

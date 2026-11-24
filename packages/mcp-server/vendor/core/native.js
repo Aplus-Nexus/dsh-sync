@@ -64,12 +64,27 @@ export function parseLogBytes(bytes) {
   return { header, events: lines.slice(1), raw: lines }
 }
 
-/** Encode a header + event lines back into the exact physical layout DSH writes. */
+/**
+ * Encode a header + events back into the exact physical layout DSH writes.
+ *
+ * Events may be JSONL text lines or plain objects. Before this accepted only
+ * strings, and passing objects silently wrote `[object Object]` — a log that
+ * looks fine until DSH tries to read it — so anything that is neither is now a
+ * hard error rather than a corrupt file.
+ */
 export function encodeLogBytes(header, events) {
   const headerLine = `${JSON.stringify(header)}\n`
   const headerFrame = zstdCompressSync(Buffer.from(headerLine, 'utf8'))
   if (events.length === 0) return headerFrame
-  const bodyFrame = zstdCompressSync(Buffer.from(`${events.join('\n')}\n`, 'utf8'))
+  const lines = events.map((event, index) => {
+    if (typeof event === 'string') {
+      if (event.trim() === '') throw new TypeError(`event ${index} is an empty line`)
+      return event
+    }
+    if (event !== null && typeof event === 'object') return JSON.stringify(event)
+    throw new TypeError(`event ${index} must be a JSON line or an object, received ${typeof event}`)
+  })
+  const bodyFrame = zstdCompressSync(Buffer.from(`${lines.join('\n')}\n`, 'utf8'))
   return Buffer.concat([headerFrame, bodyFrame])
 }
 

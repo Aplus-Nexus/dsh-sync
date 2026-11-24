@@ -66,6 +66,19 @@ test('missing cwd falls back instead of crashing', () => {
   assert.equal(localizeHeader({ ...header, cwd: undefined }, '/root').cwd, '/root')
 })
 
+test('object events are encoded as JSON lines', () => {
+  // Passing objects used to write `[object Object]` into a log that looked valid.
+  const bytes = encodeLogBytes(header, [{ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }])
+  const parsed = parseLogBytes(bytes)
+  assert.equal(parsed.events.length, 1)
+  assert.deepEqual(JSON.parse(parsed.events[0]), { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } })
+})
+
+test('a non-event is refused instead of corrupting the log', () => {
+  assert.throws(() => encodeLogBytes(header, [42]), /must be a JSON line or an object/)
+  assert.throws(() => encodeLogBytes(header, ['   ']), /empty line/)
+})
+
 test('tailFrom keeps only events after a sequence number', () => {
   assert.equal(tailFrom(events, 1).length, 1)
   assert.equal(tailFrom(events, -1).length, 3)

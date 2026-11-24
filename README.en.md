@@ -33,6 +33,7 @@ Chat clients sync because the conversation lives on their servers. DSH keeps you
 - **No conflict by construction** — each device writes only under its own prefix; a rejected push rebases and retries.
 - **Native phone UI** — a "Sync" capsule above the dsh-go composer, a live status strip, and a panel with counts, key fingerprint and recent conversations.
 - **Cross-agent bus** — `dsh-sync-mcp` exposes six tools to any MCP client: sync, list, read, search, add note, list notes.
+- **Foreign conversations become native ones** — Codex has no DSH log, so the plugin synthesizes one in DSH's own format, validates it with DSH's codec before writing, and the conversation is then continuable on the phone.
 
 ## Quick start
 
@@ -74,7 +75,8 @@ Read [SECURITY.md](SECURITY.md) before trusting it with anything sensitive.
 - Attachments are referenced by id; the bytes do not travel.
 - Model keys never sync.
 - A 1400-event conversation is roughly 0.9 MB in the repository after compression and encryption.
-- Codex needs MCP support; otherwise use `dsh-sync ingest` with an exported transcript.
+- Codex needs MCP support; otherwise use `dsh-sync ingest --native` with an exported transcript.
+- A synthesized conversation keeps tool calls as visible text: a fabricated tool lifecycle would be invalid, so the structure is not reproduced.
 
 ## Licence
 

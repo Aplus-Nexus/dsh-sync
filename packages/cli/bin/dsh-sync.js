@@ -6,7 +6,7 @@
  *
  *   dsh-sync init --repo https://github.com/you/dsh-sync-data.git
  *   dsh-sync status
- *   dsh-sync ingest <file> --session <id> [--device <name>] [--agent <name>] / pull
+ *   dsh-sync ingest <file> --session <id> [--device <name>] [--agent <name>] [--native] / pull
  *   dsh-sync export <session> --out chat.md
  */
 import { readFile, writeFile } from 'node:fs/promises'
@@ -34,7 +34,7 @@ const HELP = `dsh-sync — message-level encrypted sync for DSH / dsh-go / Codex
 Usage
   dsh-sync init [--repo <url>] [--folder <dir>] [--device <name>] [--passphrase <phrase>]
   dsh-sync status
-  dsh-sync ingest <file> --session <id> [--device <name>] [--agent <name>]
+  dsh-sync ingest <file> --session <id> [--device <name>] [--agent <name>] [--native]
   dsh-sync pull
   dsh-sync verify
   dsh-sync extras [--settings] [--skills] [--dry-run]
@@ -233,6 +233,18 @@ async function main() {
     if (records.length === 0) throw new Error('no messages found in that file')
     const result = await engine.push(records)
     process.stdout.write(`导入 ${session}：${result.records} 条，${humanBytes(result.bytes)}\n`)
+    if (options.native === true) {
+      // Also materialize it as a DSH session on this machine, so the app lists it
+      // and the conversation can be continued here.
+      const { synthesizeSession, synthesizeSessionId, writeLog } = await import('../vendor/core/index.js')
+      const targetId = synthesizeSessionId(session)
+      const cwd = process.env.DSH_SYNC_CWD ?? process.cwd()
+      const { header, events } = synthesizeSession({ sessionId: targetId, records, cwd, sourceLabel: String(options.agent ?? 'external') })
+      const written = await writeLog({ sessionsRoot: join(DSH_HOME(), 'sessions'), header, events })
+      process.stdout.write(written.imported
+        ? `已生成原生会话 ${written.sessionId}（${events.length} 个事件）\n`
+        : `原生会话已存在，未覆盖：${written.path ?? targetId}\n`)
+    }
     return 0
   }
 

@@ -177,6 +177,66 @@ export class SyncRuntime {
     }
   }
 
+  /**
+   * Create a native, continuable DSH session for a conversation that has no
+   * DSH log of its own (Codex, Claude Code, an imported transcript).
+   *
+   * The synthesized log is validated with DSH's codec before it is written, and
+   * the session stays untouched on every later sync.
+   */
+  async synthesizeFromRecords(engine, sessionId, records) {
+    const { synthesizeSession, synthesizeSessionId, writeLog } = await import('../vendor/core/index.js')
+    const targetId = synthesizeSessionId(sessionId)
+    const cwd = this.workspaceCwd()
+    const existing = await hasLocalSession(this.sessionsRoot, { id: targetId, cwd })
+    if (existing !== false) return { imported: false, reason: 'exists' }
+    const { header, events } = synthesizeSession({
+      sessionId: targetId,
+      records,
+      cwd,
+      sourceLabel: records[0]?.agent === 'codex' ? 'codex' : (records[0]?.agent ?? 'imported'),
+    })
+    const validation = await this.validateLog(header, events)
+    if (validation !== true) return { imported: false, reason: `invalid-log: ${validation}` }
+    const result = await writeLog({ sessionsRoot: this.sessionsRoot, header, events })
+    engine.state.sessions[sessionId] = {
+      ...(engine.state.sessions[sessionId] ?? {}),
+      synthesizedId: targetId,
+      importedAt: Date.now(),
+    }
+    await engine.writeState()
+    return { imported: result.imported, path: result.path, sessionId: result.sessionId ?? targetId, synthesized: true, reason: result.reason }
+  }
+
+  /** An absolute working directory this device can actually open. */
+  workspaceCwd() {
+    const candidate = process.env.DSH_SYNC_CWD ?? process.cwd()
+    return candidate.startsWith('/') || /^[A-Za-z]:[\\/]/.test(candidate) ? candidate : '/'
+  }
+
+  /**
+   * Ask DSH's own session codec whether a log is valid.
+   *
+   * The codec is optional: a host without it skips the check rather than
+   * refusing to import, and the caller reports that honestly.
+   */
+  async validateLog(header, events) {
+    let catalog
+    try {
+      catalog = await import('@deepseek-ai/dsh-session-format-catalog')
+    } catch {
+      return true
+    }
+    try {
+      const restore = catalog.sessionFormatCatalog.createRestore(header, { recovery: 'recoverable', validation: 'current' })
+      for (const event of events) restore.decodeRow(event, { emitEvent() {}, emitRun() {} })
+      restore.finish()
+      return true
+    } catch (error) {
+      return error.message
+    }
+  }
+
   /** How far each imported session was already present when it arrived here. */
   importedPrefixes() {
     const out = {}
@@ -259,8 +319,9 @@ export class SyncRuntime {
     const results = []
     for (const [sessionId, list] of bySession) {
       const header = engine.state.sessions?.[sessionId]?.header
-      if (header === undefined || typeof header !== 'object') continue
-      const exists = await hasLocalSession(this.sessionsRoot, header)
+      const exists = header === undefined || typeof header !== 'object'
+        ? false
+        : await hasLocalSession(this.sessionsRoot, header)
       if (exists !== false) {
         results.push({ sessionId, imported: false, reason: 'exists' })
         continue
@@ -290,7 +351,11 @@ export class SyncRuntime {
           results.push({ sessionId, ...result })
           continue
         }
-        results.push({ sessionId, imported: false, reason: 'no-native-log' })
+        // No native log: the conversation came from another agent, so build a
+        // real DSH session for it instead of leaving it as a read-only mirror.
+        const synth = await this.synthesizeFromRecords(engine, sessionId, list)
+        results.push({ sessionId, ...synth })
+        continue
       } catch (error) {
         results.push({ sessionId, imported: false, reason: error.message })
       }

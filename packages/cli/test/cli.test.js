@@ -89,6 +89,33 @@ test('JSONL transcripts are ingested too', async () => {
   }
 })
 
+test('--native also materializes a real DSH session', async () => {
+  const { dir, env } = await workspace()
+  try {
+    const source = join(dir, 'chat.md')
+    await writeFile(source, '## 用户\n\nCodex 里的话\n\n## 助手\n\n现在也是原生的了\n')
+    const dshHome = join(dir, 'dsh')
+    const result = await run(['ingest', source, '--session', 'codex-42', '--agent', 'codex', '--native'], { ...env, DSH_HOME: dshHome })
+    assert.equal(result.code, 0, result.stderr)
+    assert.match(result.stdout, /已生成原生会话 session-import-codex-42/)
+
+    const { readdir, stat } = await import('node:fs/promises')
+    const projects = await readdir(join(dshHome, 'sessions'))
+    assert.equal(projects.length, 1)
+    const sessionDir = join(dshHome, 'sessions', projects[0], 'session-import-codex-42')
+    const [log] = await readdir(sessionDir)
+    assert.match(log, /^session\.v4\.jsonl\.zstd$/)
+    assert.ok((await stat(join(sessionDir, log))).size > 0)
+
+    // Running it again must not overwrite the existing session.
+    const again = await run(['ingest', source, '--session', 'codex-42', '--agent', 'codex', '--native'], { ...env, DSH_HOME: dshHome })
+    assert.equal(again.code, 0)
+    assert.match(again.stdout, /已存在，未覆盖/)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('verify passes on a healthy repository and fails after tampering', async () => {
   const { dir, repo, env } = await workspace()
   try {

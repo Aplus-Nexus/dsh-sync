@@ -19,6 +19,10 @@ First release. Everything below is new.
   conversation can be continued on the receiving device.
 - **Echo suppression**: a device that imported a session publishes only its own
   continuation, never the imported prefix.
+- **Foreign conversations become native**: a conversation with no DSH log of its
+  own (Codex, Claude Code, an imported transcript) is synthesized into a valid
+  v4 session, checked with DSH's own codec, and can be continued on any device.
+  `dsh-sync ingest --native` does the same from the command line.
 - **DSH / dsh-go plugin**: "Sync" capsule, live status strip, and a panel with
   push/pull counts, key fingerprint and recent conversations; a `sync_now` tool;
   a `/sync` command; automatic sync on an interval and after each turn.

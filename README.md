@@ -44,6 +44,7 @@
 - **天然抗冲突**：每台设备只写自己路径下的块，推送被拒就变基重试；同一 seq 不会被两个设备覆盖。
 - **手机原生界面**：dsh-go 输入框上方的「同步」胶囊、实时状态条、独立面板（推送/拉取计数、密钥指纹、最近对话）。
 - **跨智能体总线**：`dsh-sync-mcp` 给任何 MCP 客户端（Codex、Claude Code、你自己的 agent）六个工具：同步、列会话、读全文、搜索、写笔记、读笔记。
+- **外部对话也能变成原生会话**：Codex 那边没有 DSH 日志，插件会用 DSH 自己的格式把它合成为一段**可继续对话的原生会话**，并先用 DSH 的 codec 校验再落盘。
 - **可选的附带同步**：设置与模型渠道（**永远不含密钥**）、技能、`AGENTS.md`、dsh-go 的 `ui.json`。
 
 ## 快速开始
@@ -160,7 +161,8 @@ https://aplus-nexus.github.io/dsh-sync/market-index.json
 - **附件只存引用**。图片按 attachment id 记，字节本身不跟着走。
 - **密钥不同步**。模型渠道那部分只同步结构，密钥永远留在本机。
 - **Git 仓会变大**。一条 1400 事件的会话约 0.9 MB（压缩+加密后）；大仓库建议定期 `git gc`。
-- **Codex 侧是 MCP**，需要它支持 MCP server；不支持的环境只能用 `dsh-sync ingest` 导入 transcript。
+- **Codex 侧是 MCP**，需要它支持 MCP server；不支持的环境用 `dsh-sync ingest --native` 导入 transcript 并生成本地会话。
+- **外部对话是合成出来的**：工具调用保留为可见文字（无法伪造成合法的 tool 生命周期），不还原原始工具结果结构。
 
 ## 开发
 

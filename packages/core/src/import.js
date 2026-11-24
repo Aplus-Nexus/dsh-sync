@@ -12,7 +12,22 @@ import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { encodeLogBytes, headerSummary, localizeHeader, logPathFor } from './native.js'
 
-export async function importNativeSession({ sessionsRoot, header, events, fallbackCwd, now = () => new Date() }) {
+/**
+ * Import one foreign session, refusing to replace anything that already exists.
+ *
+ * @returns {{imported: boolean, path?: string, sessionId?: string, reason?: string}}
+ */
+export async function importNativeSession({ sessionsRoot, header, events, fallbackCwd }) {
+  return writeLog({ sessionsRoot, header, events, fallbackCwd })
+}
+
+/**
+ * Write one log at its canonical path without any import policy.
+ *
+ * `importNativeSession` is the guarded entry point; this is the mechanism it
+ * and the synthesizer share, so both publish a file the same way.
+ */
+export async function writeLog({ sessionsRoot, header, events, fallbackCwd }) {
   const target = localizeHeader(header, fallbackCwd)
   const path = logPathFor(sessionsRoot, target.cwd, target.id, target.version ?? 4)
   const existing = await stat(path).catch(() => undefined)
