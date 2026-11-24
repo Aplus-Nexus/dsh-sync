@@ -51,6 +51,9 @@ Environment
 
 const DSH_HOME = () => process.env.DSH_HOME ?? join(homedir(), '.dsh')
 
+/** `## 用户` / `### Assistant:` and similar transcript headings. */
+const HEADING = /^#{1,6}\s*(用户|助手|User|Assistant|You|AI|Human|Codex|DSH)\s*:?\s*$/i
+
 function parseArgs(argv) {
   const [command, ...rest] = argv
   const options = {}
@@ -307,7 +310,9 @@ function parseTranscript(raw, { session, device, agent }) {
     buffer = []
   }
   for (const line of raw.split('\n')) {
-    const heading = /^#{1,6}\s+(用户|助手|User|Assistant|You|AI|Human|Codex|DSH)\b:?\s*$/.exec(line.trim())
+    // No `\b`: CJK labels are not word characters, so a boundary assertion after
+    // 用户 never matches and the whole transcript would collapse into one message.
+    const heading = HEADING.exec(line.trim())
     if (heading !== null) {
       flush()
       const label = heading[1].toLowerCase()

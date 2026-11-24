@@ -65,6 +65,9 @@ test('a Markdown transcript is ingested, listed and exported', async () => {
     const text = await readFile(out, 'utf8')
     assert.match(text, /把同步做完/)
     assert.match(text, /引擎已经过测试/)
+    // The two messages must stay separate: CJK headings have no word boundary.
+    assert.match(text, /## 用户/)
+    assert.match(text, /## 助手/)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
