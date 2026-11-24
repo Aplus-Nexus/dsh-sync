@@ -31,6 +31,7 @@ export {
 } from './native.js'
 export { importNativeSession, hasLocalSession, readLocalLog, digestOfBytes, writeLog } from './import.js'
 export { synthesizeSession, synthesizeSessionId, encodeSynthesizedLog } from './synthesize.js'
+export { mergeNativeBranches, buildConflictTail } from './native-merge.js'
 export {
   encodeChunks,
   decodeChunk,

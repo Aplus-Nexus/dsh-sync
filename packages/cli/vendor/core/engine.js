@@ -13,7 +13,7 @@
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { deriveKey, keyFingerprint, open, seal } from './crypto.js'
-import { decodeChunk, encodeChunks, notePath, SALT_PATH, parseChunkName } from './store.js'
+import { decodeChunk, encodeChunks, notePath, SALT_PATH, parseChunkName, parseNativeName } from './store.js'
 import { canonicalJson, digestOf, humanBytes, isoTime, nowMs, parseJson } from './util.js'
 import { comparePortable, titleOf } from './portable.js'
 
@@ -216,7 +216,21 @@ export class SyncEngine {
       }
       this.state.chunks[entry.path] = digestOf(await this.backend.read(entry.path))
     }
+    // An interrupted push can leave two chunks covering the same sequence range.
+    // Both are intact, so the fix is at read time: one record per id.
+    const unique = new Map()
+    let duplicates = 0
     for (const record of records) {
+      if (typeof record.id !== 'string') continue
+      if (unique.has(record.id)) {
+        duplicates += 1
+        continue
+      }
+      unique.set(record.id, record)
+    }
+    const deduped = [...unique.values()]
+
+    for (const record of deduped) {
       const session = record.origin?.session
       if (typeof session !== 'string') continue
       const known = this.state.sessions[session] ?? {}
@@ -226,18 +240,32 @@ export class SyncEngine {
       known.lastTs = Math.max(known.lastTs ?? 0, record.origin?.ts ?? 0)
       this.state.sessions[session] = known
     }
-    if (this.mirrorDir !== null) await this.writeMirror(records)
-    this.state.stats.pulled += records.length
+    if (this.mirrorDir !== null) await this.writeMirror(deduped)
+    this.state.stats.pulled += deduped.length
     this.state.stats.bytesIn += bytes
     this.state.lastPullAt = nowMs()
     await this.writeState()
-    return { records, sessions: this.sessions(), bytes, skipped }
+    return { records: deduped, sessions: this.sessions(), bytes, skipped, duplicates }
   }
 
   /** Append pulled records to per-session JSONL files any agent can read. */
   async writeMirror(records) {
     const bySession = new Map()
+    // An interrupted push can leave two chunks covering the same sequence range.
+    // Both are intact, so the fix is at read time: one record per id.
+    const unique = new Map()
+    let duplicates = 0
     for (const record of records) {
+      if (typeof record.id !== 'string') continue
+      if (unique.has(record.id)) {
+        duplicates += 1
+        continue
+      }
+      unique.set(record.id, record)
+    }
+    const deduped = [...unique.values()]
+
+    for (const record of deduped) {
       const session = record.origin?.session
       if (typeof session !== 'string') continue
       if (!bySession.has(session)) bySession.set(session, [])
@@ -315,6 +343,55 @@ export class SyncEngine {
       if (notes.length >= limit) break
     }
     return notes.sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0))
+  }
+
+  /**
+   * Remove chunk files whose sequence range is already covered by another chunk
+   * of the same session and device.
+   *
+   * This repairs the one redundancy an interrupted push can create: a shorter
+   * chunk left behind when the next attempt re-sent a longer range. Reading is
+   * already duplicate-safe; compacting keeps the repository from growing.
+   *
+   * @returns {{removed: number, bytes: number}}
+   */
+  async compact() {
+    const listing = await this.backend.list('')
+    const groups = new Map()
+    for (const entry of listing) {
+      const parts = entry.path.split('/')
+      const [area, root, device, name] = parts
+      if (area !== 'data' && area !== 'native') continue
+      const range = area === 'data' ? parseChunkName(name ?? '') : parseNativeName(name ?? '')
+      if (range === undefined) continue
+      const key = `${area}/${root}/${device}`
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key).push({ path: entry.path, size: entry.size ?? 0, ...range })
+    }
+    const doomed = []
+    for (const chunks of groups.values()) {
+      // A longer chunk with the same start comes first, so it wins the coverage.
+      chunks.sort((a, b) => a.first - b.first || b.last - a.last)
+      let coveredTo = -1
+      for (const chunk of chunks) {
+        if (chunk.last <= coveredTo) {
+          doomed.push(chunk)
+          continue
+        }
+        coveredTo = Math.max(coveredTo, chunk.last)
+      }
+    }
+    let bytes = 0
+    for (const chunk of doomed) {
+      bytes += chunk.size
+      await this.backend.remove(chunk.path)
+      delete this.state.chunks[chunk.path]
+    }
+    if (doomed.length > 0) {
+      await this.backend.sync({ direction: 'push', message: `sync: compact ${doomed.length} overlapping chunk(s)` })
+      await this.writeState()
+    }
+    return { removed: doomed.length, bytes }
   }
 
   /** Forget one local session's sync bookkeeping (does not touch the repository). */

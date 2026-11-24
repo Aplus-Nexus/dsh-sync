@@ -31,6 +31,8 @@ Chat clients sync because the conversation lives on their servers. DSH keeps you
 - **End-to-end encryption** — scrypt-derived key, AES-256-GCM, per-file IV, path-bound AAD. A wrong passphrase simply cannot decrypt; tampering is detected.
 - **No server** — a private Git repository (GitHub, Gitea, self-hosted) or any synced folder.
 - **No conflict by construction** — each device writes only under its own prefix; a rejected push rebases and retries.
+- **Simultaneous turns never lose a word** — when two devices really do diverge on the same turn, the session's owner keeps the canonical branch and the other branch opens as its own conversation titled `（冲突1）`, ready to continue.
+- **A joining device carries only what it syncs** — `pushScope: synced` publishes only conversations that arrived from the bus, so its existing history is never uploaded.
 - **Native phone UI** — a "Sync" capsule above the dsh-go composer, a live status strip, and a panel with counts, key fingerprint and recent conversations.
 - **Cross-agent bus** — `dsh-sync-mcp` exposes six tools to any MCP client: sync, list, read, search, add note, list notes.
 - **Foreign conversations become native ones** — Codex has no DSH log, so the plugin synthesizes one in DSH's own format, validates it with DSH's codec before writing, and the conversation is then continuable on the phone.

@@ -1,6 +1,6 @@
 {
   "name": "@aplus-nexus/dsh-sync-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Message-level, end-to-end encrypted session sync core for DSH, dsh-go and Codex",
   "type": "module",
   "main": "src/index.js",

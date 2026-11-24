@@ -35,6 +35,13 @@ export const Config = Schema.object({
   syncSettings: Schema.boolean().default(false).description('同步设置与模型渠道'),
   /** Also sync skills, AGENTS.md and the dsh-go ui.json. */
   syncSkills: Schema.boolean().default(false).description('同步技能与界面配置'),
+  /**
+   * `all` publishes every local conversation (the source device).
+   * `synced` publishes only conversations that arrived from the bus, so a
+   * device that joins later never uploads its own unrelated history and nothing
+   * on it changes except the conversations it actually syncs.
+   */
+  pushScope: Schema.union([Schema.const('all'), Schema.const('synced')]).default('all').description('推送范围'),
 })
 
 export function resolvePaths(config, home) {

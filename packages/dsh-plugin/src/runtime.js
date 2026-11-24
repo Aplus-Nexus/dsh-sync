@@ -118,7 +118,13 @@ export class SyncRuntime {
 
       // ---- push -------------------------------------------------------
       const sessions = await this.source.list()
-      const ids = sessions.map((row) => row.sessionId).filter((id) => typeof id === 'string')
+      let ids = sessions.map((row) => row.sessionId).filter((id) => typeof id === 'string')
+      if (this.config.pushScope === 'synced') {
+        // Only conversations that came from the bus. Everything else on this
+        // device stays private and untouched, which is what "only affect the
+        // synced conversations" means.
+        ids = ids.filter((id) => engine.state.sessions?.[id]?.importedAt !== undefined)
+      }
       const collected = await this.source.collect(ids)
       // A session this device imported already exists on the bus under its
       // origin device. Re-pushing its prefix would duplicate every message
@@ -155,6 +161,8 @@ export class SyncRuntime {
 
       // ---- pull -------------------------------------------------------
       const pulled = await engine.pull()
+      // Overlap only appears after an interrupted push; repair it when seen.
+      const compaction = pulled.duplicates > 0 ? await engine.compact() : { removed: 0 }
       const imported = this.config.importNative === true ? await this.importPulled(engine, pulled.records) : []
 
       this.lastResult = {
@@ -164,6 +172,9 @@ export class SyncRuntime {
         pushed: pushed.records,
         pulled: pulled.records.length,
         imported: imported.filter((entry) => entry.imported === true).length,
+        conflicts: imported.reduce((total, entry) => total + (entry.conflicts?.filter((fork) => fork.created === true).length ?? 0), 0),
+        compacted: compaction.removed,
+        duplicates: pulled.duplicates,
         extras: extrasOut.length,
         skipped: pulled.skipped,
       }
@@ -202,6 +213,9 @@ export class SyncRuntime {
     engine.state.sessions[sessionId] = {
       ...(engine.state.sessions[sessionId] ?? {}),
       synthesizedId: targetId,
+      // The synthesized log is now this device's copy of the origin, so pushing
+      // it back would duplicate every message under a second identity.
+      importedThroughSeq: lastSequence(events.map((event) => JSON.stringify(event))),
       importedAt: Date.now(),
     }
     await engine.writeState()
@@ -322,29 +336,32 @@ export class SyncRuntime {
       if (!bySession.has(session)) bySession.set(session, [])
       bySession.get(session).push(record)
     }
+    // A session may arrive with only its native chunks (the author published no
+    // portable records yet), so enumerate those too instead of missing them.
+    for (const entry of await engine.backend.list('native/')) {
+      const sessionId = entry.path.split('/')[1]
+      if (typeof sessionId !== 'string' || sessionId === '') continue
+      if (!bySession.has(sessionId)) bySession.set(sessionId, [])
+    }
+
     const results = []
     for (const [sessionId, list] of bySession) {
-      const header = engine.state.sessions?.[sessionId]?.header
-      const exists = header === undefined || typeof header !== 'object'
-        ? false
-        : await hasLocalSession(this.sessionsRoot, header)
-      if (exists !== false) {
-        results.push({ sessionId, imported: false, reason: 'exists' })
-        continue
-      }
       try {
         const native = await this.readNativeLog(engine, sessionId)
-        if (native !== null) {
+        if (native === null) {
+          // No native log: the conversation came from another agent, so build a
+          // real DSH session for it instead of leaving it as a read-only mirror.
+          results.push({ sessionId, ...(await this.synthesizeFromRecords(engine, sessionId, list)) })
+          continue
+        }
+
+        const localHeader = engine.state.sessions?.[sessionId]?.header
+        const exists = localHeader === undefined ? false : await hasLocalSession(this.sessionsRoot, native.header)
+        const entry = { sessionId, imported: false }
+        if (exists === false) {
           const result = await importNativeSession({ sessionsRoot: this.sessionsRoot, header: native.header, events: native.events, fallbackCwd: process.cwd() })
           if (result.imported === true) {
-            const lastSeq = native.events.reduce((max, line) => {
-              try {
-                const seq = JSON.parse(line).seq
-                return Number.isInteger(seq) && seq > max ? seq : max
-              } catch {
-                return max
-              }
-            }, -1)
+            const lastSeq = lastSequence(native.events)
             engine.state.sessions[sessionId] = {
               ...(engine.state.sessions[sessionId] ?? {}),
               importedThroughSeq: lastSeq,
@@ -353,14 +370,19 @@ export class SyncRuntime {
               localPath: result.path,
             }
             await engine.writeState()
+            entry.imported = true
+            entry.path = result.path
+          } else {
+            entry.reason = result.reason
           }
-          results.push({ sessionId, ...result })
-          continue
+        } else {
+          entry.reason = 'exists'
         }
-        // No native log: the conversation came from another agent, so build a
-        // real DSH session for it instead of leaving it as a read-only mirror.
-        const synth = await this.synthesizeFromRecords(engine, sessionId, list)
-        results.push({ sessionId, ...synth })
+
+        // A diverged branch is never dropped: it becomes its own conversation.
+        const forks = await this.materializeConflicts(engine, sessionId, native, list)
+        if (forks.length > 0) entry.conflicts = forks
+        results.push(entry)
         continue
       } catch (error) {
         results.push({ sessionId, imported: false, reason: error.message })
@@ -370,55 +392,87 @@ export class SyncRuntime {
   }
 
   /**
+   * Open every divergent branch as its own conversation, titled `（冲突N）`.
+   *
+   * The fork keeps the canonical prefix so it reads as a coherent conversation,
+   * then the losing branch's events, then a title event that names it. Each
+   * branch is created once: the mapping is recorded in state, so a later sync
+   * neither re-creates it nor overwrites the user's edits inside it.
+   */
+  async materializeConflicts(engine, sessionId, native, list) {
+    if (native.conflict !== true || native.branches.length === 0) return []
+    const { buildConflictTail, writeLog } = await import('../vendor/core/index.js')
+    const known = engine.state.sessions?.[sessionId]?.conflicts ?? {}
+    const baseTitle = engine.state.sessions?.[sessionId]?.title ?? titleOf(list) ?? '同步的对话'
+    const created = []
+
+    let index = Object.keys(known).length
+    for (const branch of native.branches) {
+      if (known[branch.device] !== undefined) continue
+      index += 1
+      const forkId = `${sessionId}-c${index}`
+      const prefix = native.events.filter((line) => sequenceOf(line) < branch.fromSeq)
+      const tail = buildConflictTail({
+        prefix,
+        branch: branch.events,
+        lastSeq: branch.fromSeq - 1,
+        title: `${baseTitle}（冲突${index}）`,
+      })
+      const header = { ...native.header, id: forkId, createdAt: Date.now(), isSeeded: false, delegationDepth: 0 }
+      delete header.parentSession
+      delete header.origin
+      const validation = await this.validateLog(header, tail)
+      if (validation !== true) {
+        created.push({ forkId, created: false, reason: `invalid-log: ${validation}` })
+        continue
+      }
+      const written = await writeLog({ sessionsRoot: this.sessionsRoot, header, events: tail, fallbackCwd: this.workspaceCwd() })
+      created.push({ forkId, created: written.imported === true, device: branch.device, reason: written.reason })
+      if (written.imported === true) {
+        known[branch.device] = { forkId, at: Date.now() }
+        engine.state.sessions[sessionId] = { ...(engine.state.sessions[sessionId] ?? {}), conflicts: known }
+        await engine.writeState()
+      }
+    }
+    return created
+  }
+
+  /**
    * Reassemble one session's native log from every device's chunks.
    *
-   * A conversation can be continued on a second device after import, so chunks
-   * from several devices have to merge. Events are keyed by their sequence
-   * number: the author's prefix wins, a continuation fills in after it, and a
-   * duplicated event can never appear twice in the restored log.
+   * A conversation can be continued on several devices after import. Where two
+   * devices wrote different events at the same sequence, the session's owner
+   * keeps the canonical branch and every other branch is returned separately so
+   * it can be opened as its own conversation. Nothing is silently dropped.
+   *
+   * @returns {{header: object, events: string[], branches: object[], conflict: boolean}|null}
    */
   async readNativeLog(engine, sessionId) {
-    const { decodeNativeChunk, parseNativeName } = await import('../vendor/core/index.js')
+    const { decodeNativeChunk, parseNativeName, mergeNativeBranches } = await import('../vendor/core/index.js')
     const listing = await engine.backend.list(`native/${sessionId}/`)
     const parts = []
     for (const entry of listing) {
       const range = parseNativeName(entry.path.split('/').pop() ?? '')
-      if (range !== undefined) parts.push({ range, path: entry.path })
-    }
-    if (parts.length === 0) return null
-    parts.sort((a, b) => a.range.first - b.range.first)
-    const bySeq = new Map()
-    let header = null
-    for (const part of parts) {
+      if (range === undefined) continue
+      const device = entry.path.split('/')[2] ?? 'unknown'
       let text
       try {
-        text = decodeNativeChunk(engine.key, part.path, await engine.backend.read(part.path))
+        text = decodeNativeChunk(engine.key, entry.path, await engine.backend.read(entry.path))
       } catch {
         continue
       }
-      for (const line of text.split('\n')) {
-        if (line.trim() === '') continue
-        let value
-        try {
-          value = JSON.parse(line)
-        } catch {
-          continue
-        }
-        if (value?.type === 'session' && value.id !== undefined) {
-          // The first chunk's header is the author's own; a later device's
-          // chunk only carries the same header again, never a different one.
-          if (header === null) header = value
-          else if (header.id !== value.id) throw new Error(`session ${sessionId} has chunks for two different sessions`)
-          continue
-        }
-        if (Number.isInteger(value?.seq) && !bySeq.has(value.seq)) bySeq.set(value.seq, line)
-      }
+      parts.push({ device, range, lines: text.split('\n').filter((line) => line.trim() !== '') })
     }
-    if (header === null) return null
-    const events = [...bySeq.entries()].sort((a, b) => a[0] - b[0]).map((entry) => entry[1])
-    // Keep `type: "session"` on the header: encodeLogBytes writes it back as
-    // the first physical line and DSH requires it there.
-    return { header, events }
+    if (parts.length === 0) return null
+    parts.sort((a, b) => a.range.first - b.range.first)
+
+    const owner = engine.state.sessions?.[sessionId]?.device
+    const merged = mergeNativeBranches(parts, { ownerDevice: owner })
+    if (merged.header === null) return null
+    merged.lines = parts
+    // Keep `type: "session"` on the header: encodeLogBytes writes it back as the
+    // first physical line and DSH requires it there.
+    return merged
   }
 
   /** Title list for the panel, merging local and remote knowledge. */
@@ -448,3 +502,22 @@ function defaultDeviceName() {
 }
 
 export { titleOf }
+
+/** Last sequence number in a list of event lines. */
+function lastSequence(lines) {
+  let max = -1
+  for (const line of lines) {
+    const seq = sequenceOf(line)
+    if (seq > max) max = seq
+  }
+  return max
+}
+
+function sequenceOf(line) {
+  try {
+    const value = JSON.parse(line)
+    return Number.isInteger(value?.seq) ? value.seq : -1
+  } catch {
+    return -1
+  }
+}

@@ -4,6 +4,34 @@ All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-11-24
+
+### Added
+
+- **Conflict copies instead of lost turns.** When two devices append different
+  events at the same sequence, the session's owner keeps the canonical branch
+  and the other branch becomes its own conversation, titled `（冲突N）`. The fork
+  keeps the canonical prefix so it reads as a coherent conversation, and it is
+  created once — a later sync never re-creates or overwrites it.
+- **`pushScope: synced`.** A joining device publishes only conversations that
+  arrived from the bus. Everything already on that device stays private and is
+  never uploaded.
+- **Chunk compaction.** Chunks whose sequence range is fully covered by a longer
+  one are removed on the next sync, repairing what an interrupted push leaves
+  behind.
+- **`docs/onboarding-prompt.md`**: a ready-to-paste prompt that walks another
+  dsh-go agent through install, configuration and verification.
+
+### Fixed
+
+- A pull now returns one record per id. An interrupted push could leave two
+  chunks covering the same range, and every message in them was counted twice
+  (317 duplicates in a real vault before this fix).
+- A synthesized conversation no longer re-publishes the whole log it was built
+  from: its imported prefix is recorded, so only genuine new turns are sent.
+- Native-only sessions (a peer that published chunks but no portable records)
+  are now discovered and imported instead of being ignored.
+
 ## [0.2.0] — 2026-11-24
 
 ### Added
