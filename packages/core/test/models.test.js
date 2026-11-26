@@ -248,6 +248,9 @@ test('comments around entries survive a merge', async () => {
 })
 
 test('the patch path is derived from the DSH home', () => {
-  assert.equal(profilePatchPath('/root/.dsh'), '/root/.dsh/profiles/web/cordis.patch.yml')
-  assert.equal(profilePatchPath('/root/.dsh', 'tui'), '/root/.dsh/profiles/tui/cordis.patch.yml')
+  // `join` is platform-specific, so compare the segments rather than a literal
+  // path: the same code produces a POSIX path on Linux and a Windows one there.
+  const segments = (path) => path.split(/[\\/]/).filter((part) => part !== '')
+  assert.deepEqual(segments(profilePatchPath('/root/.dsh')), ['root', '.dsh', 'profiles', 'web', 'cordis.patch.yml'])
+  assert.deepEqual(segments(profilePatchPath('/root/.dsh', 'tui')), ['root', '.dsh', 'profiles', 'tui', 'cordis.patch.yml'])
 })
