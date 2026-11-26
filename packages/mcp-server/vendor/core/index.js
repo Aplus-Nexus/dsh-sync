@@ -33,6 +33,15 @@ export { importNativeSession, hasLocalSession, readLocalLog, digestOfBytes, writ
 export { synthesizeSession, synthesizeSessionId, encodeSynthesizedLog } from './synthesize.js'
 export { mergeNativeBranches, buildConflictTail } from './native-merge.js'
 export {
+  readModelConfig,
+  mergeModelConfig,
+  stripModelSecrets,
+  containsSecret,
+  describeRoutes,
+  profilePatchPath,
+  SECRET_PLACEHOLDER,
+} from './models.js'
+export {
   encodeChunks,
   decodeChunk,
   chunkPath,

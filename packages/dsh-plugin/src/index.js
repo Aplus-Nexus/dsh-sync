@@ -92,6 +92,7 @@ function registerNative(ctx, runtime) {
             bytesIn: status.totals?.bytesIn ?? '—',
             lastText: status.lastResult === null ? '还没有同步过' : `${relativeTime(status.lastResult.at, true)} · 推送 ${status.lastResult.pushed} / 拉取 ${status.lastResult.pulled}`,
             errorLine: status.lastError === null ? '' : `⚠ ${status.lastError.message}`,
+            routes: await modelSummary(),
             sessions: rows.slice(0, 20).map((row) => ({
               title: row.title,
               subtitle: `${row.device} · ${row.records} 条`,
@@ -157,6 +158,7 @@ function panelView(scope, caps, runtime) {
           [zh ? '上次同步' : 'Last sync', { $: 'data.lastText' }],
         ],
       },
+      { type: 'text', text: { $: 'data.routes' }, tone: 'muted' },
       { type: 'text', text: zh ? '最近的对话（最多 20 条）' : 'Recent conversations (top 20)', style: { weight: 'bold' } },
       { type: 'list', items: { $: 'data.sessions' } },
       {
@@ -170,6 +172,30 @@ function panelView(scope, caps, runtime) {
         ? [{ type: 'text', text: zh ? '关闭面板后仍会在后台自动同步。' : 'Automatic sync continues after this panel closes.', tone: 'muted' }]
         : []),
     ],
+  }
+}
+
+/**
+ * One line describing the model routes this device uses.
+ *
+ * Read at panel-open time rather than cached: a user who changes a model in
+ * another tab expects the panel to agree with the app.
+ */
+async function modelSummary() {
+  try {
+    const { readModelConfig, describeRoutes, profilePatchPath } = await import('../vendor/core/index.js')
+    const home = process.env.DSH_HOME ?? `${process.env.HOME}/.dsh`
+    const config = await readModelConfig(profilePatchPath(home))
+    if (config === null) return ''
+    const routes = describeRoutes(config.entries)
+    const search = routes.searchKind === 'model'
+      ? `搜索模型 ${routes.searchModel ?? '—'}`
+      : `搜索走 ${routes.searchProvider ?? '—'}`
+    return `对话 ${routes.chat ?? '—'} · ${search} · ${routes.models} 个模型`
+  } catch {
+    // The panel is a status surface, not a config editor: a failure here must
+    // not blank the whole panel.
+    return ''
   }
 }
 

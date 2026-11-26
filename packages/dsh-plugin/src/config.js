@@ -36,6 +36,17 @@ export const Config = Schema.object({
   /** Also sync skills, AGENTS.md and the dsh-go ui.json. */
   syncSkills: Schema.boolean().default(false).description('同步技能与界面配置'),
   /**
+   * Publish this device's model routes, provider catalogue and the separate
+   * search model. API keys are never published — a peer keeps its own.
+   */
+  syncModels: Schema.boolean().default(false).description('同步模型配置（不含密钥）'),
+  /**
+   * Apply model config that arrived from a peer to this device's patch file.
+   * Off by default: it edits a file the user also edits, and the rewrite does
+   * not preserve comments.
+   */
+  applyModels: Schema.boolean().default(false).description('把同步来的模型配置写入本机'),
+  /**
    * `all` publishes every local conversation (the source device).
    * `synced` publishes only conversations that arrived from the bus, so a
    * device that joins later never uploads its own unrelated history and nothing

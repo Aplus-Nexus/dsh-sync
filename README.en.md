@@ -35,6 +35,7 @@ Chat clients sync because the conversation lives on their servers. DSH keeps you
 - **A joining device carries only what it syncs** — `pushScope: synced` publishes only conversations that arrived from the bus, so its existing history is never uploaded.
 - **Native phone UI** — a "Sync" capsule above the dsh-go composer, a live status strip, and a panel with counts, key fingerprint and recent conversations.
 - **Cross-agent bus** — `dsh-sync-mcp` exposes six tools to any MCP client: sync, list, read, search, add note, list notes.
+- **Model config sync** — chat routes, the provider catalogue and the separate search model follow your devices; **API keys never do**. Each device runs the same route with its own key. A Search-API deployment is reported as `searchKind: api`, not as a missing search model.
 - **Foreign conversations become native ones** — Codex has no DSH log, so the plugin synthesizes one in DSH's own format, validates it with DSH's codec before writing, and the conversation is then continuable on the phone.
 
 ## Quick start

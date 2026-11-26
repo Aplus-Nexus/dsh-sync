@@ -4,6 +4,31 @@ All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-11-26
+
+### Added
+
+- **Model configuration sync** (`syncModels`, `applyModels`, both off by
+  default). Chat routes, the provider catalogue and the auxiliary search model
+  travel between devices as structured entries. An API key never does: provider
+  blocks are parsed rather than copied, a key value is replaced by a reference
+  (`apiKeyEnv`) or a placeholder, and a device that receives a shared route keeps
+  its **own** key.
+- **Search is modelled separately** from the chat route: `web.searchProvider`
+  says how search runs, and `web-search-deepseek.model` is the auxiliary model
+  that provider uses. `describeRoutes()` reports `searchKind: api | model`, so a
+  Search-API deployment is not misreported as "no search model".
+- **Model routes appear on the phone panel**, read live so it agrees with the
+  app after a model change.
+- A merge **preserves the comments** in the target patch file, so a rewrite does
+  not silently delete a person's notes.
+
+### Fixed
+
+- `js-yaml` is loaded on demand, not at module scope. Importing it eagerly broke
+  the MCP server and the CLI, which have no reason to depend on a YAML parser.
+- A merge now reports how many entries were already in sync (`unchanged`).
+
 ## [0.3.4] — 2026-11-26
 
 ### Fixed

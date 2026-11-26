@@ -10,6 +10,7 @@
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
 import { seal, open } from './crypto.js'
+import { readModelConfig, mergeModelConfig } from './models.js'
 import { canonicalJson, digestOf, parseJson } from './util.js'
 
 /** Paths that must never be published, whatever a caller asks for. */
@@ -80,8 +81,8 @@ export async function collectExtras({ home, settings = false, skills = false, ui
       if (redacted === null) continue
       out.push({ kind: 'settings', name: candidate.replace(/[^A-Za-z0-9]+/g, '-'), payload: { file: candidate, text: redacted, redacted: true } })
     }
-    const routes = await readProfileRoutes(home)
-    if (routes !== null) out.push({ kind: 'settings', name: 'model-routes', payload: routes })
+    const models = await readModelConfig(join(home, 'profiles', 'web', 'cordis.patch.yml'))
+    if (models !== null) out.push({ kind: 'models', name: 'model-config', payload: { entries: models.entries, redacted: true } })
   }
   if (skills === true) {
     const agents = await readFile(join(home, 'AGENTS.md'), 'utf8').catch(() => null)
@@ -111,29 +112,6 @@ function redactDocument(name, text) {
   const looksSecret = /(^|\s)(api_?key|apikey|token|secret|password|passphrase|authorization|cookie)\s*[:=]\s*\S+/i.test(text)
   if (looksSecret) return null
   return text
-}
-
-/** Model routes from the profile patch, with every key value stripped. */
-async function readProfileRoutes(home) {
-  const patch = await readFile(join(home, 'profiles', 'web', 'cordis.patch.yml'), 'utf8').catch(() => null)
-  if (patch === null) return null
-  // The patch is YAML, and a model provider block mixes a catalogue with a
-  // credential reference. Without a YAML dependency the honest operation is to
-  // share only the non-secret model catalogue, never a whole provider block.
-  const kept = []
-  let keeping = false
-  for (const line of patch.split('\n')) {
-    if (/^\s*-?\s*(id|name|model|models|displayName|baseURL|contextWindow|provider)\s*:/i.test(line)) {
-      keeping = !/apiKey|token|secret|password/i.test(line)
-    } else if (/^\s+(- )?/.test(line) && line.trim() !== '') {
-      keeping = keeping && !/apiKey|token|secret|password/i.test(line)
-    } else {
-      keeping = false
-    }
-    if (keeping) kept.push(line)
-  }
-  if (kept.length === 0) return null
-  return { file: 'profiles/web/cordis.patch.yml', text: kept.join('\n'), redacted: true }
 }
 
 /**

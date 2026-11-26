@@ -106,7 +106,18 @@ test('collectExtras only reads what it is asked for', async () => {
     await writeFile(join(dir, 'AGENTS.md'), '# rules')
     await writeFile(join(dir, 'skills', 'demo', 'SKILL.md'), '# skill')
     await mkdir(join(dir, 'profiles', 'web'), { recursive: true })
-    await writeFile(join(dir, 'profiles', 'web', 'cordis.patch.yml'), 'apiKey: sk-should-not-travel\nmodel: deepseek\n')
+    await writeFile(join(dir, 'profiles', 'web', 'cordis.patch.yml'), [
+      '- id: llm-pi-ai',
+      '  config:',
+      '    providers:',
+      '      custom-x:',
+      '        baseURL: https://x.example/v1',
+      '        apiKey: sk-should-not-travel',
+      '        models:',
+      '          - id: deepseek-v4-flash',
+      '            name: DeepSeek V4 Flash',
+      '',
+    ].join('\n'))
     await writeFile(join(dir, '.credentials.yaml'), 'refs: {apiKey: sk-no}')
 
     const skillsOnly = await collectExtras({ home: dir, skills: true })
@@ -114,10 +125,10 @@ test('collectExtras only reads what it is asked for', async () => {
     assert.equal(JSON.stringify(skillsOnly).includes('sk-should-not-travel'), false)
 
     const withSettings = await collectExtras({ home: dir, settings: true })
-    const routes = withSettings.find((item) => item.name === 'model-routes')
-    assert.notEqual(routes, undefined)
-    assert.equal(JSON.stringify(withSettings).includes('sk-should-not-travel'), false)
-    assert.equal(JSON.stringify(withSettings).includes('deepseek'), true)
+    const models = withSettings.find((item) => item.kind === 'models')
+    assert.notEqual(models, undefined, 'the model catalogue travels')
+    assert.equal(JSON.stringify(withSettings).includes('sk-should-not-travel'), false, 'no key travels')
+    assert.equal(JSON.stringify(withSettings).includes('deepseek'), true, 'the route names do')
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

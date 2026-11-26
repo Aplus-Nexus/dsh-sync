@@ -151,14 +151,23 @@ export class SyncRuntime {
 
       // ---- extras (opt-in) --------------------------------------------
       let extrasOut = []
-      if (this.config.syncSettings === true || this.config.syncSkills === true) {
-        const { collectExtras, publishExtras } = await import('../vendor/core/index.js')
+      if (this.config.syncSettings === true || this.config.syncSkills === true || this.config.syncModels === true) {
+        const { collectExtras, publishExtras, readModelConfig, profilePatchPath } = await import('../vendor/core/index.js')
+        const home = this.paths.home ?? process.env.DSH_HOME ?? `${process.env.HOME}/.dsh`
         const items = await collectExtras({
-          home: this.paths.home ?? process.env.DSH_HOME ?? `${process.env.HOME}/.dsh`,
+          home,
           settings: this.config.syncSettings === true,
           skills: this.config.syncSkills === true,
           ui: this.config.syncSkills === true,
         })
+        if (this.config.syncModels === true) {
+          // Model config is published as its own kind so a peer can merge it
+          // without touching unrelated settings.
+          const models = await readModelConfig(profilePatchPath(home))
+          if (models !== null) {
+            items.push({ kind: 'models', name: 'model-config', payload: { entries: models.entries, redacted: true } })
+          }
+        }
         extrasOut = await publishExtras(engine, items)
       }
 
@@ -167,6 +176,7 @@ export class SyncRuntime {
       // Overlap only appears after an interrupted push; repair it when seen.
       const compaction = pulled.duplicates > 0 ? await engine.compact() : { removed: 0 }
       const imported = this.config.importNative === true ? await this.importPulled(engine, pulled.records) : []
+      const modelsApplied = this.config.applyModels === true ? await this.applyModels(engine) : null
 
       this.lastResult = {
         reason,
@@ -179,6 +189,7 @@ export class SyncRuntime {
         compacted: compaction.removed,
         duplicates: pulled.duplicates,
         extras: extrasOut.length,
+        models: modelsApplied === null ? 0 : modelsApplied.created.length + modelsApplied.updated.length,
         skipped: pulled.skipped,
       }
       this.lastError = null
@@ -439,6 +450,33 @@ export class SyncRuntime {
       }
     }
     return created
+  }
+
+  /**
+   * Merge the newest published model config into this device's profile patch.
+   *
+   * Only non-secret fields are taken; an existing key on this device is never
+   * replaced by a peer's. The merge is skipped when the patch has no model
+   * entries yet and nothing was published, so a device that never opted in is
+   * left untouched.
+   */
+  async applyModels(engine) {
+    const { readExtras, mergeModelConfig, profilePatchPath } = await import('../vendor/core/index.js')
+    const home = this.paths.home ?? process.env.DSH_HOME ?? `${process.env.HOME}/.dsh`
+    const published = await readExtras(engine, 'models')
+    if (published.length === 0) return null
+    const newest = published[0]
+    const entries = newest.payload?.entries
+    if (!Array.isArray(entries) || entries.length === 0) return null
+    try {
+      const result = await mergeModelConfig(profilePatchPath(home), entries)
+      this.lastModels = { at: nowMs(), ...result, device: newest.device }
+      return result
+    } catch (error) {
+      // A file the user is editing must never be half-written; report instead.
+      this.lastError = { message: `模型配置未写入：${error.message}`, at: nowMs() }
+      return null
+    }
   }
 
   /**
