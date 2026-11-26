@@ -1,6 +1,6 @@
 {
   "name": "@aplus-nexus/dsh-sync",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Message-level encrypted session sync for the dsh-go phone app and DSH",
   "type": "module",
   "main": "src/index.js",

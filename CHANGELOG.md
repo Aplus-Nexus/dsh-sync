@@ -4,6 +4,36 @@ All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] — 2026-11-26
+
+A vault could grow to gigabytes while holding a handful of conversations. Three
+defects combined, and all three are fixed.
+
+### Fixed
+
+- **The cursor was never persisted.** `open()` read `state.cursor`, nothing
+  wrote it, so every process started at sequence -1 and republished every
+  conversation on every tick. The cursor is now saved in the same step as the
+  push that produced it, and a test asserts a fresh engine resumes from it.
+- **`push()` discarded the cursor it was given.** It called `commit({})`
+  instead of passing the collected map through, so even within one process the
+  next tick re-sent everything.
+- **Unchanged content was re-sealed and re-written.** A fresh random IV makes
+  identical plaintext a different blob, so git could never delta two versions of
+  one chunk. Chunk and metadata writes are now skipped when the plaintext is
+  unchanged.
+- `scripts/rebuild-vault.mjs` no longer deletes the state file. Resetting the
+  cursor is what caused the growth in the first place; it is now opt-in via
+  `--reset-cursor` and prints a warning.
+
+### Upgrade note
+
+An existing vault keeps its bloated history: git cannot shrink a repository by
+rewriting the tip, and GitHub does not garbage-collect unreachable objects on
+its own. Republishing into a fresh repository is the only way to reclaim the
+space, and `scripts/rebuild-vault.mjs --yes` does that from a device that still
+holds the conversations.
+
 ## [0.3.1] — 2026-11-24
 
 ### Fixed

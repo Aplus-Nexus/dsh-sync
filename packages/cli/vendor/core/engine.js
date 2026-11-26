@@ -82,6 +82,7 @@ export class SyncEngine {
     this.state.device = this.device
     this.state.cursor = this.state.cursor ?? {}
     this.state.chunks = this.state.chunks ?? {}
+    this.state.plain = this.state.plain ?? {}
     this.state.sessions = this.state.sessions ?? {}
     this.state.stats = this.state.stats ?? { pushed: 0, pulled: 0, bytesOut: 0, bytesIn: 0 }
     await this.writeState()
@@ -114,6 +115,10 @@ export class SyncEngine {
    *
    * @param {object[]} records portable records with `origin`.
    * @param {object} [options]
+   * @param {object} [options.advanced] `{ sessionId: lastSeq }` collected with these records;
+   *   handed to `commit` after the push succeeds so the caller's cursor advances. Passing the
+   *   empty object here (the old behaviour) left the cursor at -1 forever, which made every
+   *   sync re-publish the whole conversation.
    * @param {(advanced: object) => void} [options.commit] called after the push succeeds.
    * @param {object} [options.sessionHeaders] `{ sessionId: header }` for native import on peers.
    * @returns {{files: number, records: number, bytes: number}}
@@ -135,8 +140,15 @@ export class SyncEngine {
       const withMeta = header === undefined ? list : [{ __meta: { header, device: this.device, session: sessionId, agent: this.agent } }, ...list]
       const encoded = encodeChunks(this.key, { root, device: this.device, records: withMeta.map(toChunkRecord) })
       for (const file of encoded) {
+        // A fresh random IV makes the same plaintext a different blob, so git
+        // could never delta two versions of one chunk. Skip the write when the
+        // content is unchanged: nothing to publish, nothing to store.
+        const plainDigest = digestOf(file.plain)
+        if (this.state.chunks[file.path] !== undefined && this.state.plain?.[file.path] === plainDigest) continue
         await this.backend.write(file.path, file.bytes)
         this.state.chunks[file.path] = digestOf(file.bytes)
+        this.state.plain = this.state.plain ?? {}
+        this.state.plain[file.path] = plainDigest
         bytes += file.bytes.length
         files += 1
       }
@@ -166,15 +178,29 @@ export class SyncEngine {
     this.state.stats.pushed += records.length
     this.state.stats.bytesOut += bytes
     this.state.lastPushAt = nowMs()
-    options.commit?.({})
+    const advanced = options.advanced ?? {}
+    options.commit?.(advanced)
+    if (Object.keys(advanced).length > 0) await this.saveCursor(advanced)
     await this.writeState()
     return { files, records: records.length, bytes }
   }
 
+  /**
+   * Publish one session's metadata.
+   *
+   * A fresh IV makes identical content a different blob, so the write is
+   * skipped when nothing changed: metadata is rewritten on every push and
+   * would otherwise add one blob per commit for no reason.
+   */
   async writeSessionMeta(root, meta) {
     const path = `sessions/${root}/meta.json.enc`
-    const bytes = seal(this.key, Buffer.from(canonicalJson(meta)), `dsh-sync:meta:${path}`)
+    const plain = canonicalJson(meta)
+    const plainDigest = digestOf(plain)
+    if (this.state.plain?.[path] === plainDigest) return
+    const bytes = seal(this.key, Buffer.from(plain), `dsh-sync:meta:${path}`)
     await this.backend.write(path, bytes)
+    this.state.plain = this.state.plain ?? {}
+    this.state.plain[path] = plainDigest
   }
 
   /**
@@ -287,6 +313,20 @@ export class SyncEngine {
     }
   }
 
+  /**
+   * Persist the source cursor so the next `open()` resumes instead of
+   * re-sending everything.
+   *
+   * The cursor was previously kept only in memory: `open()` read
+   * `state.cursor`, nothing ever wrote it, so every sync started at -1 and
+   * republished the whole conversation. This is the write half.
+   */
+  async saveCursor(cursor) {
+    if (cursor === undefined || cursor === null) return
+    this.state.cursor = { ...(this.state.cursor ?? {}), ...cursor }
+    await this.writeState()
+  }
+
   /** Sessions known locally, newest activity first. */
   sessions() {
     const out = []
@@ -390,6 +430,7 @@ export class SyncEngine {
       bytes += chunk.size
       await this.backend.remove(chunk.path)
       delete this.state.chunks[chunk.path]
+      delete this.state.plain?.[chunk.path]
     }
     if (doomed.length > 0) {
       await this.backend.sync({ direction: 'push', message: `sync: compact ${doomed.length} overlapping chunk(s)` })

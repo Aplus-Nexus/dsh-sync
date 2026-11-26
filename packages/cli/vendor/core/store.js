@@ -68,7 +68,9 @@ export function encodeChunks(key, { root, device, records }) {
     const last = piece.length > 0 ? piece[piece.length - 1].origin.seq : 0
     const path = chunkPath(root, device, first, last)
     const plain = [...head, ...piece].map((record) => canonicalJson(record)).join('\n') + '\n'
-    files.push({ path, bytes: seal(key, Buffer.from(plain, 'utf8'), `dsh-sync:chunk:${path}`), count: piece.length })
+    // `plain` is returned so the caller can tell whether this chunk's content
+    // actually changed; re-sealing identical content only adds history weight.
+    files.push({ path, bytes: seal(key, Buffer.from(plain, 'utf8'), `dsh-sync:chunk:${path}`), plain, count: piece.length })
   }
   return files
 }

@@ -142,6 +142,9 @@ export class SyncRuntime {
       }
       const pushed = await engine.push(collected.records, {
         sessionHeaders: headers,
+        // The cursor only advances when the push actually succeeded; passing the
+        // collected map is what stops the next sync from re-sending everything.
+        advanced: collected.advanced,
         commit: (advanced) => this.source.commit(advanced),
       })
       await this.pushNative(engine, headers)
@@ -288,10 +291,8 @@ export class SyncRuntime {
         const lastSeq = parsed.events[parsed.events.length - 1] === undefined
           ? -1
           : (JSON.parse(parsed.events[parsed.events.length - 1]).seq ?? parsed.events.length - 1)
-        if (lastSeq < fromSeq) {
-          this.ctx.logger?.warn?.(`dsh-sync: nothing new for ${sessionId} (last ${lastSeq}, pushed ${fromSeq - 1})`)
-          continue
-        }
+        // Nothing new is the normal case on a timer tick; stay quiet.
+        if (lastSeq < fromSeq) continue
         const tail = tailFrom(parsed.events, fromSeq - 1)
         const chunk = [`${JSON.stringify(parsed.header)}`, ...tail].join('\n') + '\n'
         const target = nativePath(parsed.header.id ?? sessionId, this.device, fromSeq, lastSeq)
