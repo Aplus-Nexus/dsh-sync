@@ -302,6 +302,9 @@ export class SyncRuntime {
           pushedSeq: lastSeq,
           nativeHeader: parsed.header,
         }
+        // Persist immediately: an interrupted run must not restart the native
+        // log from zero and add a full copy to the history.
+        await engine.writeState()
       } catch (error) {
         // Loud enough to debug, quiet enough not to nag a user every minute.
         this.lastError = this.lastError ?? { message: error.message, at: Date.now() }
