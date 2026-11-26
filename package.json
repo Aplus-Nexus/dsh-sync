@@ -1,6 +1,6 @@
 {
   "name": "dsh-sync-monorepo",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "type": "module",
   "description": "Message-level, end-to-end encrypted cloud sync for DSH Go / DSH / Codex",

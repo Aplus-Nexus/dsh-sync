@@ -7,9 +7,22 @@
  * phone, a laptop or a server; the state directory decides which device it is.
  */
 import { createInterface } from 'node:readline'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// Advertise the real version: a pinned number drifts from the package on every
+// release, and clients compare versions when they reconnect.
+const SERVER_VERSION = (() => {
+  try {
+    const pkg = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'))
+    return typeof pkg.version === 'string' ? pkg.version : '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+})()
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
 import {
   FolderBackend,
   GitBackend,
@@ -20,7 +33,7 @@ import {
   titleOf,
 } from '../vendor/core/index.js'
 
-const SERVER = { name: 'dsh-sync', version: '0.1.0' }
+const SERVER = { name: 'dsh-sync', version: SERVER_VERSION }
 const PROTOCOL = '2024-11-05'
 
 const TOOLS = [

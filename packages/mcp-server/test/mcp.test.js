@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,6 +9,7 @@ import { MemoryBackend } from '../../core/src/backends.js'
 import { SyncEngine } from '../../core/src/engine.js'
 
 const MCP = fileURLToPath(new URL('../bin/mcp.js', import.meta.url))
+const PLUGIN_VERSION = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version
 
 function startServer(env) {
   const child = spawn(process.execPath, [MCP], { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] })
@@ -60,6 +61,8 @@ test('the MCP server advertises the bus tools', async () => {
     const init = await server.call('initialize', {})
     assert.equal(init.result.serverInfo.name, 'dsh-sync')
     assert.equal(init.result.protocolVersion, '2024-11-05')
+    // The reported version must track package.json, not a pinned literal.
+    assert.equal(init.result.serverInfo.version, PLUGIN_VERSION)
     const list = await server.call('tools/list', {})
     const names = list.result.tools.map((tool) => tool.name)
     assert.deepEqual(names, ['sync_now', 'list_sessions', 'read_session', 'search', 'add_note', 'list_notes'])

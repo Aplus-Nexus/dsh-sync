@@ -1,6 +1,6 @@
 {
   "name": "@aplus-nexus/dsh-sync-cli",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Command line for dsh-sync: first-run setup, verify, sessions and export",
   "type": "module",
   "bin": {

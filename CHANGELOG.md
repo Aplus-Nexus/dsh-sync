@@ -4,6 +4,23 @@ All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] — 2026-11-26
+
+### Fixed
+
+- The MCP server advertised a pinned `0.1.0` in `serverInfo.version` while the
+  package moved on. Clients compare versions on reconnect, so a stale number is
+  a reconnect bug waiting to happen; it now reads the package's own version.
+
+### Docs
+
+- `docs/onboarding-prompt.md` is rewritten as a reusable, device-independent
+  prompt: the same text is sent to every new device, and the only per-device
+  inputs are the repository URL, the shared passphrase, a token, and a unique
+  `deviceName`. It states the `pushScope: synced` rule as the one setting that
+  prevents a privacy accident, includes the key-fingerprint check as a hard
+  stop, and no longer points at a `--restart` flag that does not exist.
+
 ## [0.3.2] — 2026-11-26
 
 A vault could grow to gigabytes while holding a handful of conversations. Three
