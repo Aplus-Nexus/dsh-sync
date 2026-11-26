@@ -1,6 +1,6 @@
 {
   "name": "@aplus-nexus/dsh-sync-mcp",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "MCP server that lets Codex, Claude Code and any MCP agent share a DSH message bus",
   "type": "module",
   "bin": {

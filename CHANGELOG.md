@@ -4,6 +4,20 @@ All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-11-26
+
+### Added
+
+- `dsh-sync models` shows the current chat route, whether search runs on an
+  auxiliary model or a dedicated API, and the provider catalogue.
+  `--publish` shares that (without keys), `--apply --dry-run` previews a
+  peer's config, and `--apply` writes it.
+
+### Fixed
+
+- A Windows runner joins `C:\` paths, so a test asserting a POSIX patch path
+  failed only there; the test now compares segments.
+
 ## [0.4.0] — 2026-11-26
 
 ### Added
