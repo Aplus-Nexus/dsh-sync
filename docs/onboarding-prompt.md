@@ -33,7 +33,7 @@ dsh plugin --profile web add @aplus-nexus/dsh-sync
 
 让用户去 https://github.com/settings/personal-access-tokens/new 建一个 **Fine-grained token**：
 
-- Repository access：**Only select repositories** → 只选 `dsh-sync-data`
+- Repository access：**Only select repositories** → 只选 `dsh-sync-main`
 - Permissions：**Contents: Read and write**（其余全部 No access）
 - 有效期建议 90 天
 
@@ -56,7 +56,7 @@ $DSH_HOME/profiles/web/cordis.patch.yml
   config:
     enabled: true
     backend: git
-    repoUrl: <用户给的仓库地址，形如 https://github.com/<用户名>/dsh-sync-data.git>
+    repoUrl: <用户给的仓库地址，形如 https://github.com/<用户名>/dsh-sync-main.git>
     branch: main
     token: <你刚建的那个令牌>
     passphrase: <用户给你的同步口令>
@@ -121,12 +121,12 @@ npx @aplus-nexus/dsh-sync-cli verify
 **给智能体之前，先准备好三样东西：**
 
 1. 口令：在你主手机的 `（主手机上的口令文件）` 里（我把口令单独放文件，就是为了不经过聊天记录）。
-2. 仓库地址：`https://github.com/Aplus-Nexus/dsh-sync-data.git`
+2. 仓库地址：`https://github.com/Aplus-Nexus/dsh-sync-main.git`
 3. 令牌：让智能体自己引导你建，或你先建好给它。
 
 **给智能体的方式：** 把本文件上半段（到"完成后向用户报告"为止）整段贴进那台手机的对话，再补一句：
 
-> 仓库是 https://github.com/Aplus-Nexus/dsh-sync-data.git，口令我等下单独给你，设备名叫 xxx。
+> 仓库是 https://github.com/Aplus-Nexus/dsh-sync-main.git，口令我等下单独给你，设备名叫 xxx。
 > 本机已有的对话不要动，也不要上传。
 
 **用完记得：** 把口令从聊天里清掉（那台手机的对话本身也会留在本机，但它不会因为 `pushScope: synced` 而上传）。

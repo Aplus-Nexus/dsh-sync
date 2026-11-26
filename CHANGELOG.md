@@ -31,8 +31,12 @@ defects combined, and all three are fixed.
 An existing vault keeps its bloated history: git cannot shrink a repository by
 rewriting the tip, and GitHub does not garbage-collect unreachable objects on
 its own. Republishing into a fresh repository is the only way to reclaim the
-space, and `scripts/rebuild-vault.mjs --yes` does that from a device that still
-holds the conversations.
+space.
+
+The repository name matters too: renaming the old vault is what stops a still
+running engine from pushing to it. `scripts/rebuild-vault.mjs --yes` publishes
+into the configured repository from a device that still holds the
+conversations.
 
 ## [0.3.1] — 2026-11-24
 
