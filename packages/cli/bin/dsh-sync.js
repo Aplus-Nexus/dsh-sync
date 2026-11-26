@@ -38,6 +38,7 @@ Usage
   dsh-sync pull
   dsh-sync verify
   dsh-sync extras [--settings] [--skills] [--dry-run]
+  dsh-sync models [--show] [--publish] [--apply] [--dry-run]
   dsh-sync sessions
   dsh-sync export <session-id> [--out <file>] [--format md|json]
   dsh-sync note --title <t> --body <b>
@@ -197,6 +198,47 @@ async function main() {
     const items = await collectExtras({ home: config.home ?? DSH_HOME(), settings: options.settings === true, skills: options.skills === true, ui: options.skills === true })
     const written = await publishExtras(engine, items)
     process.stdout.write(`发布 ${written.length} 项（设置/技能/界面）\n`)
+    return 0
+  }
+
+  if (command === 'models') {
+    const { readModelConfig, describeRoutes, mergeModelConfig, profilePatchPath } = await import('../vendor/core/index.js')
+    const home = config.home ?? DSH_HOME()
+    const patch = profilePatchPath(home, config.profile ?? 'web')
+    const engine = options.publish === true || options.apply === true ? await engineFor(config) : null
+
+    if (options.publish === true) {
+      const local = await readModelConfig(patch)
+      if (local === null) throw new Error('本机 patch 里没有模型配置可发布')
+      const { publishExtras } = await import('../vendor/core/extras.js')
+      const written = await publishExtras(engine, [{ kind: 'models', name: 'model-config', payload: { entries: local.entries, redacted: true } }])
+      process.stdout.write(`已发布 ${written.length} 项模型配置（不含密钥）\n`)
+      return 0
+    }
+
+    if (options.apply === true) {
+      const { readExtras } = await import('../vendor/core/extras.js')
+      const published = await readExtras(engine, 'models')
+      if (published.length === 0) throw new Error('仓库里还没有模型配置')
+      const result = await mergeModelConfig(patch, published[0].payload.entries, { dryRun: options['dry-run'] === true })
+      process.stdout.write(`来自 ${published[0].device}：新建 ${result.created.length}，更新 ${result.updated.length}，已一致 ${result.unchanged}，保留本机密钥 ${result.keptSecrets.length}\n`)
+      for (const secret of result.keptSecrets) process.stdout.write(`  密钥保留：${secret}\n`)
+      if (options['dry-run'] === true) process.stdout.write('（dry run，未写入）\n')
+      return 0
+    }
+
+    const local = await readModelConfig(patch)
+    if (local === null) {
+      process.stdout.write('本机 patch 里没有模型配置。\n')
+      return 0
+    }
+    const routes = describeRoutes(local.entries)
+    process.stdout.write(`对话路由：${routes.chat ?? '—'}\n`)
+    const searchLine = routes.searchKind === 'model'
+      ? `模型 ${routes.searchModel ?? '—'}`
+      : `专用 API ${routes.searchProvider ?? '—'}`
+    process.stdout.write(`搜索：${searchLine}\n`)
+    process.stdout.write(`渠道：${routes.providers.join(', ') || '—'}（${routes.models} 个模型）\n`)
     return 0
   }
 

@@ -111,8 +111,24 @@ $DSH_HOME/profiles/web/cordis.patch.yml
     mirror: true
     syncSettings: false
     syncSkills: false
+    syncModels: true
+    applyModels: false
     pushScope: synced
 ```
+
+关于 `syncModels` 和 `applyModels`：
+
+- **`syncModels: true`** —— 本机把**自己的**模型路由和渠道目录发布上去。只在愿意让自己的模型配置进入这个仓库时打开。
+- **`applyModels: false`** —— 先别自动写入。把同步来的模型配置写进本机 patch 会改动你也会手改的文件。想看它要做什么，先跑：
+
+```sh
+npx @aplus-nexus/dsh-sync-cli models --show
+npx @aplus-nexus/dsh-sync-cli models --apply --dry-run
+```
+
+确认无误后再手动运行 `models --apply`，或者把 `applyModels` 改成 `true` 重启引擎。
+
+**密钥永远不会同步。** 主设备的 `apiKey` 在上传前就被替换成引用或占位符；本机拿到的是一条**路由**，用的还是你自己的 key。
 
 **为什么是 `pushScope: synced`，不是 `all`：**
 这一行让本机只上传「从仓库同步来的对话」。如果写成 `all` 或者漏掉，本机原有的私人对话会被全部推到仓库，所有人的设备都能看到。**这是唯一一条会造成隐私事故的配置**，写完请回读一遍确认。
